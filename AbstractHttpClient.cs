@@ -7,7 +7,7 @@ using System.Web;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace OBP.Core.HttpClient
+namespace Salt.HttpClient
 {
 	/// <summary>
 	/// Родительский класс для кастомных типизированных http-классов, работающих с IHttpClientFactory

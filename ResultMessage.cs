@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace OBP.Core.HttpClient
+namespace Salt.HttpClient
 {
 	/// <summary>
 	/// Ответ на запрос
