@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web;
@@ -57,6 +58,66 @@ namespace Salt.HttpClient
 		
 		private async Task<ResultMessage<T>> Get<T>(string url, Dictionary<string, string> @params = null)
 		{
+			using (HttpResponseMessage response = await _httpClient.GetAsync(GetUriString(url, @params)))
+				return await PrepareResultMessage<T>(response);
+		}
+
+		private async Task<ResultMessage<T>> Send<T>(
+			string actionPath,
+			HttpMethod httpMethod,
+			Dictionary<string, string> @params = null,
+			Dictionary<string, string> cookies = null)
+		{
+			try
+			{
+				UriBuilder uriBuilder = new(_httpClient.BaseAddress) {Path = actionPath};
+
+				using (HttpRequestMessage requestMessage =
+					GetHttpRequestMessage(uriBuilder.ToString(), httpMethod, @params, cookies))
+				using (HttpResponseMessage response = await _httpClient.SendAsync(requestMessage))
+					return await PrepareResultMessage<T>(response);
+			}
+			catch (Exception exc)
+			{
+				_logger.LogError($"Error on {httpMethod.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+				throw;
+			}
+		}
+
+		private HttpRequestMessage GetHttpRequestMessage(
+			string url,
+			HttpMethod httpMethod,
+			Dictionary<string, string> @params = null,
+			Dictionary<string, string> cookies = null)
+		{
+			HttpRequestMessage requestMessage;
+
+			if (@params == null)
+			{
+				requestMessage = new HttpRequestMessage(httpMethod, url);
+			}
+			else if (httpMethod == HttpMethod.Get)
+			{
+				requestMessage = new HttpRequestMessage(httpMethod, GetUriString(url, @params));
+			}
+			else
+			{
+				requestMessage = new HttpRequestMessage(httpMethod, url);
+				requestMessage.Content = new StringContent(JsonConvert.SerializeObject(@params));
+			}
+
+			if (cookies != null)
+			{
+				requestMessage.Headers.Add(
+					"Cookie",
+					string.Join(";", cookies.Select(x => $"{x.Key}={x.Value}")));
+			}
+
+			return requestMessage;
+		}
+		
+		private string GetUriString(string url, Dictionary<string, string> @params = null)
+		{
 			UriBuilder uriBuilder = new(url);
 			if (@params is {Count: > 0})
 			{
@@ -65,8 +126,8 @@ namespace Salt.HttpClient
 					query[parameter.Key] = parameter.Value;
 				uriBuilder.Query = query.ToString();
 			}
-			using (HttpResponseMessage response = await _httpClient.GetAsync(uriBuilder.ToString()))
-				return await PrepareResultMessage<T>(response);
+
+			return uriBuilder.ToString();
 		}
 
 		private async Task<ResultMessage<T>> AsyncOperation<T>(HttpMethod method, string actionPath, Dictionary<string, string> @params = null)
@@ -147,6 +208,13 @@ namespace Salt.HttpClient
 		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
 		protected async Task<ResultMessage<T>> AsyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
 			await AsyncOperation<T>(HttpMethod.Post, actionPath, @params);
+
+		protected async Task<ResultMessage<T>> AsyncSend<T>(
+			string actionPath,
+			HttpMethod method,
+			Dictionary<string, string> @params = null,
+			Dictionary<string, string> cookies = null) =>
+			await Send<T>(actionPath, method, @params, cookies);
 	}
 }
 
