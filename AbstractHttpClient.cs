@@ -208,7 +208,16 @@ namespace Salt.HttpClient
 		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
 		protected async Task<ResultMessage<T>> AsyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
 			await AsyncOperation<T>(HttpMethod.Post, actionPath, @params);
-
+		
+		/// <summary>
+		/// ОТправка асинхронного запроса с возможностью указывать куки.
+		/// </summary>
+		/// <param name="actionPath">путь к Action</param>
+		/// <param name="method">тип запроса (Get, Post, ...)</param>
+		/// <param name="params">список параметров</param>
+		/// <param name="cookies">Куки для отправки</param>
+		/// <typeparam name="T">Тип ответа</typeparam>
+		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
 		protected async Task<ResultMessage<T>> AsyncSend<T>(
 			string actionPath,
 			HttpMethod method,
