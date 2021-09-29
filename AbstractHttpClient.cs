@@ -17,7 +17,7 @@ namespace Salt.HttpClient
 	{
 		#region DI
 
-		private readonly ILogger _logger;
+		protected ILogger Logger { get; }
 		private readonly System.Net.Http.HttpClient _httpClient;
 
 		/// <summary>
@@ -26,7 +26,7 @@ namespace Salt.HttpClient
 		protected AbstractHttpClient(System.Net.Http.HttpClient httpClient, ILogger logger)
 		{
 			_httpClient = httpClient;
-			_logger = logger;
+			Logger = logger;
 		}
 
 		#endregion
@@ -79,7 +79,7 @@ namespace Salt.HttpClient
 			}
 			catch (Exception exc)
 			{
-				_logger.LogError($"Error on {httpMethod.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+				Logger.LogError($"Error on {httpMethod.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
 				throw;
 			}
 		}
@@ -144,7 +144,7 @@ namespace Salt.HttpClient
 			}
 			catch (Exception exc)
 			{
-				_logger.LogError($"Error on {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+				Logger.LogError($"Error on {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
 				throw;
 			}
 		}
@@ -157,12 +157,12 @@ namespace Salt.HttpClient
 			}
 			catch (ObjectDisposedException odexc)
 			{
-				_logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
+				Logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
 				throw;
 			}
 			catch (InvalidOperationException ioexc)
 			{
-				_logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
+				Logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
 				throw;
 			}
 		}
