@@ -70,10 +70,10 @@ namespace Salt.HttpClient
 		{
 			try
 			{
-				UriBuilder uriBuilder = new(_httpClient.BaseAddress) {Path = actionPath};
+				Uri uri = new Uri(_httpClient.BaseAddress, actionPath);
 
 				using (HttpRequestMessage requestMessage =
-					GetHttpRequestMessage(uriBuilder.ToString(), httpMethod, @params, cookies))
+					GetHttpRequestMessage(uri.ToString(), httpMethod, @params, cookies))
 				using (HttpResponseMessage response = await _httpClient.SendAsync(requestMessage))
 					return await PrepareResultMessage<T>(response);
 			}
