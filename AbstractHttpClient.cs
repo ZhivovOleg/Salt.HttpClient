@@ -18,14 +18,14 @@ namespace Salt.HttpClient
 		#region DI
 
 		protected ILogger Logger { get; }
-		private readonly System.Net.Http.HttpClient _httpClient;
+		protected System.Net.Http.HttpClient HttpClient { get; }
 
 		/// <summary>
 		/// Put there logger and httpClient from DI 
 		/// </summary>
 		protected AbstractHttpClient(System.Net.Http.HttpClient httpClient, ILogger logger)
 		{
-			_httpClient = httpClient;
+			HttpClient = httpClient;
 			Logger = logger;
 		}
 
@@ -52,13 +52,13 @@ namespace Salt.HttpClient
 		private async Task<ResultMessage<T>> Post<T>(string url, Dictionary<string, string> @params = null)
 		{
 			using (HttpContent content = new StringContent(JsonConvert.SerializeObject(@params)))
-			using (HttpResponseMessage response = await _httpClient.PostAsync(url, content))
+			using (HttpResponseMessage response = await HttpClient.PostAsync(url, content))
 				return await PrepareResultMessage<T>(response);
 		}
 		
 		private async Task<ResultMessage<T>> Get<T>(string url, Dictionary<string, string> @params = null)
 		{
-			using (HttpResponseMessage response = await _httpClient.GetAsync(GetUriString(url, @params)))
+			using (HttpResponseMessage response = await HttpClient.GetAsync(GetUriString(url, @params)))
 				return await PrepareResultMessage<T>(response);
 		}
 
@@ -70,16 +70,16 @@ namespace Salt.HttpClient
 		{
 			try
 			{
-				Uri uri = new Uri(_httpClient.BaseAddress, actionPath);
+				Uri uri = new Uri(HttpClient.BaseAddress, actionPath);
 
 				using (HttpRequestMessage requestMessage =
 					GetHttpRequestMessage(uri.ToString(), httpMethod, @params, cookies))
-				using (HttpResponseMessage response = await _httpClient.SendAsync(requestMessage))
+				using (HttpResponseMessage response = await HttpClient.SendAsync(requestMessage))
 					return await PrepareResultMessage<T>(response);
 			}
 			catch (Exception exc)
 			{
-				Logger.LogError($"Error on {httpMethod.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+				Logger.LogError($"Error on {httpMethod.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
 				throw;
 			}
 		}
@@ -134,7 +134,7 @@ namespace Salt.HttpClient
 		{
 			try
 			{
-				UriBuilder uriBuilder = new(_httpClient.BaseAddress) { Path = actionPath };
+				UriBuilder uriBuilder = new(HttpClient.BaseAddress) { Path = actionPath };
 				return method switch
 				{
 					{ } m when m == HttpMethod.Get => await Get<T>(uriBuilder.ToString(), @params),
@@ -144,7 +144,7 @@ namespace Salt.HttpClient
 			}
 			catch (Exception exc)
 			{
-				Logger.LogError($"Error on {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+				Logger.LogError($"Error on {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
 				throw;
 			}
 		}
@@ -157,12 +157,12 @@ namespace Salt.HttpClient
 			}
 			catch (ObjectDisposedException odexc)
 			{
-				Logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
+				Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
 				throw;
 			}
 			catch (InvalidOperationException ioexc)
 			{
-				Logger.LogError($"Error on sync {method.Method} from '{_httpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
+				Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
 				throw;
 			}
 		}
