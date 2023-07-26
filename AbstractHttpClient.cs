@@ -1,4 +1,6 @@
-﻿using System;
+﻿namespace Salt.HttpClient;
+
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
@@ -8,222 +10,219 @@ using System.Web;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Salt.HttpClient
+
+/// <summary>
+/// Родительский класс для кастомных типизированных http-классов, работающих с IHttpClientFactory
+/// </summary>
+public abstract class AbstractHttpClient
 {
-	/// <summary>
-	/// Родительский класс для кастомных типизированных http-классов, работающих с IHttpClientFactory
-	/// </summary>
-	public abstract class AbstractHttpClient
-	{
-		#region DI
+    #region DI
 
-		protected ILogger Logger { get; }
-		protected System.Net.Http.HttpClient HttpClient { get; }
+    protected ILogger Logger { get; }
+    protected System.Net.Http.HttpClient HttpClient { get; }
 
-		/// <summary>
-		/// Put there logger and httpClient from DI 
-		/// </summary>
-		protected AbstractHttpClient(System.Net.Http.HttpClient httpClient, ILogger logger)
-		{
-			HttpClient = httpClient;
-			Logger = logger;
-		}
+    /// <summary>
+    /// Put there logger and httpClient from DI 
+    /// </summary>
+    protected AbstractHttpClient(System.Net.Http.HttpClient httpClient, ILogger logger)
+    {
+        HttpClient = httpClient;
+        Logger = logger;
+    }
 
-		#endregion
+    #endregion
 
-		#region Private
-		
-		private async Task<ResultMessage<T>> PrepareResultMessage<T>(HttpResponseMessage result)
-		{
-			ResultMessage<T> resultMessage = new() { StatusCode = result.StatusCode };
-			string resultString = await result.Content.ReadAsStringAsync();
+    #region Private
 
-			if (string.IsNullOrEmpty(resultString))
-				return resultMessage;
-			
-			if (result.IsSuccessStatusCode)
-				resultMessage.Content = JsonConvert.DeserializeObject<T>(resultString);
-			else
-				resultMessage.Error = resultString;
+    private async Task<ResultMessage<T>> PrepareResultMessage<T>(HttpResponseMessage result)
+    {
+        ResultMessage<T> resultMessage = new() { StatusCode = result.StatusCode };
+        string resultString = await result.Content.ReadAsStringAsync();
 
-			return resultMessage;
-		}
-		
-		private async Task<ResultMessage<T>> Post<T>(string url, Dictionary<string, string> @params = null)
-		{
-			using (HttpContent content = new StringContent(JsonConvert.SerializeObject(@params)))
-			using (HttpResponseMessage response = await HttpClient.PostAsync(url, content))
-				return await PrepareResultMessage<T>(response);
-		}
-		
-		private async Task<ResultMessage<T>> Get<T>(string url, Dictionary<string, string> @params = null)
-		{
-			using (HttpResponseMessage response = await HttpClient.GetAsync(GetUriString(url, @params)))
-				return await PrepareResultMessage<T>(response);
-		}
+        if (string.IsNullOrEmpty(resultString))
+            return resultMessage;
 
-		private async Task<ResultMessage<T>> Send<T>(
-			string actionPath,
-			HttpMethod httpMethod,
-			Dictionary<string, string> @params = null,
-			Dictionary<string, string> cookies = null)
-		{
-			try
-			{
-				Uri uri = new Uri(HttpClient.BaseAddress, actionPath);
+        if (result.IsSuccessStatusCode)
+            resultMessage.Content = JsonConvert.DeserializeObject<T>(resultString);
+        else
+            resultMessage.Error = resultString;
 
-				using (HttpRequestMessage requestMessage =
-					GetHttpRequestMessage(uri.ToString(), httpMethod, @params, cookies))
-				using (HttpResponseMessage response = await HttpClient.SendAsync(requestMessage))
-					return await PrepareResultMessage<T>(response);
-			}
-			catch (Exception exc)
-			{
-				Logger.LogError($"Error on {httpMethod.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
-				throw;
-			}
-		}
+        return resultMessage;
+    }
 
-		private HttpRequestMessage GetHttpRequestMessage(
-			string url,
-			HttpMethod httpMethod,
-			Dictionary<string, string> @params = null,
-			Dictionary<string, string> cookies = null)
-		{
-			HttpRequestMessage requestMessage;
+    private async Task<ResultMessage<T>> Post<T>(string url, Dictionary<string, string> @params = null)
+    {
+        using (HttpContent content = new StringContent(JsonConvert.SerializeObject(@params)))
+        using (HttpResponseMessage response = await HttpClient.PostAsync(url, content))
+            return await PrepareResultMessage<T>(response);
+    }
 
-			if (@params == null)
-			{
-				requestMessage = new HttpRequestMessage(httpMethod, url);
-			}
-			else if (httpMethod == HttpMethod.Get)
-			{
-				requestMessage = new HttpRequestMessage(httpMethod, GetUriString(url, @params));
-			}
-			else
-			{
-				requestMessage = new HttpRequestMessage(httpMethod, url);
-				requestMessage.Content = new StringContent(JsonConvert.SerializeObject(@params));
-			}
+    private async Task<ResultMessage<T>> Get<T>(string url, Dictionary<string, string> @params = null)
+    {
+        using (HttpResponseMessage response = await HttpClient.GetAsync(GetUriString(url, @params)))
+            return await PrepareResultMessage<T>(response);
+    }
 
-			if (cookies != null)
-			{
-				requestMessage.Headers.Add(
-					"Cookie",
-					string.Join(";", cookies.Select(x => $"{x.Key}={x.Value}")));
-			}
+    private async Task<ResultMessage<T>> Send<T>(
+        string actionPath,
+        HttpMethod httpMethod,
+        Dictionary<string, string> @params = null,
+        Dictionary<string, string> cookies = null)
+    {
+        try
+        {
+            Uri uri = new Uri(HttpClient.BaseAddress, actionPath);
 
-			return requestMessage;
-		}
-		
-		private string GetUriString(string url, Dictionary<string, string> @params = null)
-		{
-			UriBuilder uriBuilder = new(url);
-			if (@params is {Count: > 0})
-			{
-				NameValueCollection query = HttpUtility.ParseQueryString(uriBuilder.Query);
-				foreach (KeyValuePair<string, string> parameter in @params)
-					query[parameter.Key] = parameter.Value;
-				uriBuilder.Query = query.ToString();
-			}
+            using (HttpRequestMessage requestMessage =
+                GetHttpRequestMessage(uri.ToString(), httpMethod, @params, cookies))
+            using (HttpResponseMessage response = await HttpClient.SendAsync(requestMessage))
+                return await PrepareResultMessage<T>(response);
+        }
+        catch (Exception exc)
+        {
+            Logger.LogError($"Error on {httpMethod.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+            throw;
+        }
+    }
 
-			return uriBuilder.ToString();
-		}
+    private HttpRequestMessage GetHttpRequestMessage(
+        string url,
+        HttpMethod httpMethod,
+        Dictionary<string, string> @params = null,
+        Dictionary<string, string> cookies = null)
+    {
+        HttpRequestMessage requestMessage;
 
-		private async Task<ResultMessage<T>> AsyncOperation<T>(HttpMethod method, string actionPath, Dictionary<string, string> @params = null)
-		{
-			try
-			{
-				UriBuilder uriBuilder = new(HttpClient.BaseAddress) { Path = actionPath };
-				return method switch
-				{
-					{ } m when m == HttpMethod.Get => await Get<T>(uriBuilder.ToString(), @params),
-					{ } m when m == HttpMethod.Post => await Post<T>(uriBuilder.ToString(), @params),
-					_ => throw new Exception($"Метод {method.Method} не реализован")
-				};
-			}
-			catch (Exception exc)
-			{
-				Logger.LogError($"Error on {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
-				throw;
-			}
-		}
+        if (@params == null)
+        {
+            requestMessage = new HttpRequestMessage(httpMethod, url);
+        }
+        else if (httpMethod == HttpMethod.Get)
+        {
+            requestMessage = new HttpRequestMessage(httpMethod, GetUriString(url, @params));
+        }
+        else
+        {
+            requestMessage = new HttpRequestMessage(httpMethod, url);
+            requestMessage.Content = new StringContent(JsonConvert.SerializeObject(@params));
+        }
 
-		private ResultMessage<T> SyncOperation<T>(HttpMethod method, string actionPath, Dictionary<string, string> @params = null)
-		{
-			try
-			{
-				return AsyncOperation<T>(method, actionPath, @params).ConfigureAwait(false).GetAwaiter().GetResult();
-			}
-			catch (ObjectDisposedException odexc)
-			{
-				Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
-				throw;
-			}
-			catch (InvalidOperationException ioexc)
-			{
-				Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
-				throw;
-			}
-		}
-	
-		#endregion Private
+        if (cookies != null)
+        {
+            requestMessage.Headers.Add(
+                "Cookie",
+                string.Join(";", cookies.Select(x => $"{x.Key}={x.Value}")));
+        }
 
-		/// <summary>
-		/// Отправка синхронного запроса GET
-		/// </summary>
-		/// <param name="actionPath">путь к Action</param>
-		/// <param name="params">список параметров</param>
-		/// <typeparam name="T">Тип ответа</typeparam>
-		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
-		protected ResultMessage<T> SyncGet<T>(string actionPath, Dictionary<string, string> @params = null) =>
-			SyncOperation<T>(HttpMethod.Get, actionPath, @params);
+        return requestMessage;
+    }
 
-		/// <summary>
-		/// Отправка синхронного запроса POST
-		/// </summary>
-		/// <param name="actionPath">путь к Action</param>
-		/// <param name="params">список параметров</param>
-		/// <typeparam name="T">Тип ответа</typeparam>
-		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
-		protected ResultMessage<T> SyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
-			SyncOperation<T>(HttpMethod.Post, actionPath, @params);
-		
-		/// <summary>
-		/// Отправка асинхронного запроса GET
-		/// </summary>
-		/// <param name="actionPath">путь к Action</param>
-		/// <param name="params">список параметров</param>
-		/// <typeparam name="T">Тип ответа</typeparam>
-		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
-		protected async Task<ResultMessage<T>> AsyncGet<T>(string actionPath, Dictionary<string, string> @params = null) =>
-			await AsyncOperation<T>(HttpMethod.Get, actionPath, @params);
-	
-		/// <summary>
-		/// Отправка синхронного запроса POST
-		/// </summary>
-		/// <param name="actionPath">путь к Action</param>
-		/// <param name="params">список параметров</param>
-		/// <typeparam name="T">Тип ответа</typeparam>
-		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
-		protected async Task<ResultMessage<T>> AsyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
-			await AsyncOperation<T>(HttpMethod.Post, actionPath, @params);
-		
-		/// <summary>
-		/// ОТправка асинхронного запроса с возможностью указывать куки.
-		/// </summary>
-		/// <param name="actionPath">путь к Action</param>
-		/// <param name="method">тип запроса (Get, Post, ...)</param>
-		/// <param name="params">список параметров</param>
-		/// <param name="cookies">Куки для отправки</param>
-		/// <typeparam name="T">Тип ответа</typeparam>
-		/// <returns>OBP.Core.HttpClient.ResultMessage</returns>
-		protected async Task<ResultMessage<T>> AsyncSend<T>(
-			string actionPath,
-			HttpMethod method,
-			Dictionary<string, string> @params = null,
-			Dictionary<string, string> cookies = null) =>
-			await Send<T>(actionPath, method, @params, cookies);
-	}
+    private string GetUriString(string url, Dictionary<string, string> @params = null)
+    {
+        UriBuilder uriBuilder = new(url);
+        if (@params is { Count: > 0 })
+        {
+            NameValueCollection query = HttpUtility.ParseQueryString(uriBuilder.Query);
+            foreach (KeyValuePair<string, string> parameter in @params)
+                query[parameter.Key] = parameter.Value;
+            uriBuilder.Query = query.ToString();
+        }
+
+        return uriBuilder.ToString();
+    }
+
+    private async Task<ResultMessage<T>> AsyncOperation<T>(HttpMethod method, string actionPath, Dictionary<string, string> @params = null)
+    {
+        try
+        {
+            UriBuilder uriBuilder = new(HttpClient.BaseAddress) { Path = actionPath };
+            return method switch
+            {
+                { } m when m == HttpMethod.Get => await Get<T>(uriBuilder.ToString(), @params),
+                { } m when m == HttpMethod.Post => await Post<T>(uriBuilder.ToString(), @params),
+                _ => throw new Exception($"Метод {method.Method} не реализован")
+            };
+        }
+        catch (Exception exc)
+        {
+            Logger.LogError($"Error on {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {exc.Message}", exc);
+            throw;
+        }
+    }
+
+    private ResultMessage<T> SyncOperation<T>(HttpMethod method, string actionPath, Dictionary<string, string> @params = null)
+    {
+        try
+        {
+            return AsyncOperation<T>(method, actionPath, @params).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+        catch (ObjectDisposedException odexc)
+        {
+            Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {odexc.Message}", odexc);
+            throw;
+        }
+        catch (InvalidOperationException ioexc)
+        {
+            Logger.LogError($"Error on sync {method.Method} from '{HttpClient.BaseAddress}/{actionPath}' : {ioexc.Message}", ioexc);
+            throw;
+        }
+    }
+
+    #endregion Private
+
+    /// <summary>
+    /// Отправка синхронного запроса GET
+    /// </summary>
+    /// <param name="actionPath">путь к Action</param>
+    /// <param name="params">список параметров</param>
+    /// <typeparam name="T">Тип ответа</typeparam>
+    /// <returns>OBP.Core.HttpClient.ResultMessage</returns>
+    protected ResultMessage<T> SyncGet<T>(string actionPath, Dictionary<string, string> @params = null) =>
+        SyncOperation<T>(HttpMethod.Get, actionPath, @params);
+
+    /// <summary>
+    /// Отправка синхронного запроса POST
+    /// </summary>
+    /// <param name="actionPath">путь к Action</param>
+    /// <param name="params">список параметров</param>
+    /// <typeparam name="T">Тип ответа</typeparam>
+    /// <returns>OBP.Core.HttpClient.ResultMessage</returns>
+    protected ResultMessage<T> SyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
+        SyncOperation<T>(HttpMethod.Post, actionPath, @params);
+
+    /// <summary>
+    /// Отправка асинхронного запроса GET
+    /// </summary>
+    /// <param name="actionPath">путь к Action</param>
+    /// <param name="params">список параметров</param>
+    /// <typeparam name="T">Тип ответа</typeparam>
+    /// <returns>OBP.Core.HttpClient.ResultMessage</returns>
+    protected async Task<ResultMessage<T>> AsyncGet<T>(string actionPath, Dictionary<string, string> @params = null) =>
+        await AsyncOperation<T>(HttpMethod.Get, actionPath, @params);
+
+    /// <summary>
+    /// Отправка синхронного запроса POST
+    /// </summary>
+    /// <param name="actionPath">путь к Action</param>
+    /// <param name="params">список параметров</param>
+    /// <typeparam name="T">Тип ответа</typeparam>
+    /// <returns>OBP.Core.HttpClient.ResultMessage</returns>
+    protected async Task<ResultMessage<T>> AsyncPost<T>(string actionPath, Dictionary<string, string> @params = null) =>
+        await AsyncOperation<T>(HttpMethod.Post, actionPath, @params);
+
+    /// <summary>
+    /// Отправка асинхронного запроса с возможностью указывать куки.
+    /// </summary>
+    /// <param name="actionPath">путь к Action</param>
+    /// <param name="method">тип запроса (Get, Post, ...)</param>
+    /// <param name="params">список параметров</param>
+    /// <param name="cookies">Куки для отправки</param>
+    /// <typeparam name="T">Тип ответа</typeparam>
+    /// <returns>OBP.Core.HttpClient.ResultMessage</returns>
+    protected async Task<ResultMessage<T>> AsyncSend<T>(
+        string actionPath,
+        HttpMethod method,
+        Dictionary<string, string> @params = null,
+        Dictionary<string, string> cookies = null) =>
+        await Send<T>(actionPath, method, @params, cookies);
 }
-
